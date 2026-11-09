@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Chrome</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;font-family:Arial,Helvetica,sans-serif;background:#202124;color:#e8eaed;overflow:hidden}
+#browser{height:100dvh;display:flex;flex-direction:column}
+#tabs{height:42px;display:flex;align-items:end;background:#202124;padding:6px 8px 0;gap:5px;overflow-x:auto}
+.tab{height:34px;min-width:120px;max-width:220px;flex:1;background:#35363a;border-radius:10px 10px 0 0;padding:9px 12px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;color:#d5d7da}
+.tab.active{background:#3c4043;color:#fff}.tab-add{border:0;background:transparent;color:#ddd;font-size:22px;width:36px;height:32px;cursor:pointer}
+#toolbar{min-height:56px;background:#3c4043;display:flex;align-items:center;gap:7px;padding:7px 10px}
+.tool{border:0;background:transparent;color:#e8eaed;width:34px;height:36px;border-radius:50%;font-size:20px;cursor:pointer}
+#address-wrap{display:flex;align-items:center;flex:1;min-width:0;background:#202124;border-radius:24px;padding:0 13px;height:40px;gap:8px}
+#lock{font-size:13px;color:#bdc1c6}#address{border:0;outline:0;background:transparent;color:#f1f3f4;width:100%;font-size:14px;min-width:0}
+#address::placeholder{color:#bdc1c6}#go{border:0;border-radius:20px;background:#8ab4f8;color:#202124;font-weight:600;padding:10px 14px;cursor:pointer}
+#stage{flex:1;min-height:0;background:#202124;position:relative;display:flex;align-items:flex-start;justify-content:center;overflow:auto}
+#screen{width:100%;height:auto;object-fit:fill;display:block;flex:none;touch-action:none}
+#hint{position:absolute;bottom:8px;left:10px;color:#fff;background:#202124aa;padding:4px 7px;border-radius:5px;font-size:10px;pointer-events:none}
+#login{position:fixed;inset:0;background:#202124;display:flex;align-items:center;justify-content:center;padding:20px;z-index:5}
+.panel{width:min(360px,100%);background:#303134;padding:25px;border-radius:16px}.panel h2{margin:0 0 8px}.panel p{color:#bdc1c6;line-height:1.5;font-size:14px}
+.panel input{width:100%;padding:12px;border-radius:8px;border:1px solid #666;background:#202124;color:#fff;margin:8px 0 12px}.panel button{width:100%;padding:12px;border:0;border-radius:8px;background:#8ab4f8;font-weight:bold}
+#message{font-size:12px;color:#f28b82;min-height:18px}
+@media(max-width:520px){#tabs{height:37px}.tab{height:30px;min-width:92px;padding:8px;font-size:11px}#toolbar{gap:2px;padding:6px}#address-wrap{height:39px;padding:0 9px}#address{font-size:13px}.tool{width:29px;font-size:18px}#go{padding:10px 11px}}
+</style>
+</head>
+<body>
+<div id="browser">
+  <div id="tabs"><div class="tab active">New Tab</div><button class="tab-add" id="newtab" title="New tab">+</button></div>
+  <div id="toolbar">
+    <button class="tool" id="back" title="Back">‹</button>
+    <button class="tool" id="forward" title="Forward">›</button>
+    <button class="tool" id="reload" title="Reload">↻</button>
+    <div id="address-wrap"><span id="lock">◉</span><input id="address" placeholder="Search Google or enter URL" autocomplete="off" autocapitalize="none"></div>
+    <button id="go">Go</button>
+  </div>
+  <div id="stage"><img id="screen" alt="Remote Chromium browser"><div id="hint">Tap or click to interact · Keyboard input works when focused</div></div>
+</div>
+<div id="login"><div class="panel"><h2>Chrome</h2><p>Connect to your private remote browser.</p><input id="password" type="password" placeholder="Browser password" autocomplete="current-password"><button id="connect">Connect</button><div id="message"></div></div></div>
+<script>
+const $=id=>document.getElementById(id);
+let token="",socket=null,activeTab=0,tabCount=1;
+async function api(action,data={}) {
+  const r=await fetch(`/api/${action}`,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},body:JSON.stringify(data)});
+  const d=await r.json();if(!r.ok)throw Error(d.error||"Request failed");return d;
+}
+function connect(){
+  token=$("password").value;
+  $("message").textContent="";
+  $("login").style.display="none";
+  socket=new WebSocket(`${location.protocol==="https:"?"wss":"ws"}://${location.host}/stream?token=${encodeURIComponent(token)}`);
+  socket.binaryType="blob";
+  socket.onmessage=e=>{
+    if(typeof e.data==="string"){try{const d=JSON.parse(e.data);if(d.error)$("message").textContent=d.error}catch(_){};return}
+    $("screen").src=URL.createObjectURL(e.data);
+  };
+  socket.onopen=()=>{ $("message").textContent=""; };
+  socket.onerror=()=>{ $("login").style.display="flex";$("message").textContent="Could not connect. Check your password and Render logs."; };
+  socket.onclose=()=>{};
+  refreshState();
+}
+$("connect").onclick=connect;
+$("password").addEventListener("keydown",e=>{if(e.key==="Enter")connect()});
+async function action(name,data){try{return await api(name,data)}catch(e){$("message").textContent=e.message;throw e}}
+async function navigate(){const value=$("address").value.trim();if(!value)return;try{await action("navigate",{url:value});$("address").blur();refreshState()}catch(_){}}
+$("go").onclick=navigate;
+$("address").addEventListener("keydown",e=>{if(e.key==="Enter")navigate()});
+$("back").onclick=()=>action("back").catch(()=>{});
+$("forward").onclick=()=>action("forward").catch(()=>{});
+$("reload").onclick=()=>action("reload").catch(()=>{});
+$("newtab").onclick=async()=>{await action("new-tab");refreshState()};
+async function refreshState(){
+ try{
+  const r=await fetch("/api/state",{headers:{"Authorization":`Bearer ${token}`}});
+  if(!r.ok)return;
+  const d=await r.json();activeTab=d.active;
+  $("address").value=d.url==="about:blank"?"":d.url;
+  const tabs=$("tabs");tabs.querySelectorAll(".tab").forEach(x=>x.remove());
+  d.tabs.forEach((t,i)=>{const el=document.createElement("div");el.className="tab"+(i===d.active?" active":"");el.textContent=(t.title||"New Tab").replace(/^https?:\/\//,"");el.onclick=()=>{action("switch-tab",{index:i}).then(refreshState)};el.oncontextmenu=e=>{e.preventDefault();action("close-tab").then(refreshState)};tabs.insertBefore(el,$("newtab"));});
+ }catch(_){}
+}
+function coords(e){
+ const r=$("screen").getBoundingClientRect();
+ return {x:(e.clientX-r.left)*1280/r.width,y:(e.clientY-r.top)*720/r.height};
+}
+$("screen").addEventListener("pointerdown",async e=>{
+ $("screen").focus?.();const p=coords(e);await action("input",{type:"click",...p}).catch(()=>{});
+});
+$("screen").addEventListener("wheel",e=>{
+ e.preventDefault();const p={dx:e.deltaX,dy:e.deltaY};action("input",{type:"wheel",...p}).catch(()=>{});
+},{passive:false});
+document.addEventListener("keydown",e=>{
+ if(document.activeElement===$("address")||document.activeElement===$("password"))return;
+ if(["Tab","Enter","Escape","Backspace","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key))e.preventDefault();
+ const keyMap={" ":"Space","Control":"Control","Alt":"Alt","Shift":"Shift","Meta":"Meta"};
+ action("input",{type:"keypress",key:keyMap[e.key]||e.key}).catch(()=>{});
+});
+$("screen").addEventListener("load",()=>{});
+</script>
+</body>
+</html>
