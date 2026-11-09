@@ -59,7 +59,7 @@
   function connect() {
     token = $("password").value;
     $("error").textContent = "";
-    $("viewer").src = `/novnc/vnc.html?autoconnect=true&resize=scale&view_only=false&path=websockify&token=${encodeURIComponent(token)}`;
+    $("viewer").src = `/novnc/vnc.html?autoconnect=true&resize=scale&view_only=false&path=${encodeURIComponent("websockify?token=" + token)}`;
     $("login").style.display = "none";
     $("status").textContent = "Remote Chrome";
   }
