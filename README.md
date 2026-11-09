@@ -51,3 +51,8 @@ Then open `http://localhost:10000`.
 - **Service exits during startup:** check Render logs. Chromium plus a virtual desktop may need more memory than the free instance provides.
 - **Black screen:** wait several seconds and refresh; check the `xvfb`, `x11vnc`, `websockify` and `chromium` logs in the container.
 - **Cannot connect:** confirm `BROWSER_PASSWORD` is set and matches the password entered on the page.
+
+
+## Authentication fix
+
+The noVNC static viewer assets are served without an Authorization header (the iframe cannot attach one). The VNC WebSocket itself remains protected by the `token` query parameter. This fixes the embedded viewer's `Access denied` response.

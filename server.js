@@ -11,13 +11,22 @@ const PASSWORD = process.env.BROWSER_PASSWORD;
 app.use(express.json({ limit: "20kb" }));
 
 function authorized(req) {
-  // A shared password is strongly recommended because Render services are public.
   if (!PASSWORD) return process.env.ALLOW_PUBLIC_ACCESS === "true";
-  const supplied = req.headers.authorization || "";
-  return supplied === `Bearer ${PASSWORD}`;
+  const header = req.headers.authorization || "";
+  const bearerOK = header === `Bearer ${PASSWORD}`;
+  // The noVNC iframe cannot attach an Authorization header to its asset requests.
+  // Its one-time page URL carries the same secret as a query parameter instead.
+  const queryOK = req.query.token === PASSWORD;
+  return bearerOK || queryOK;
 }
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
+
+// Static noVNC assets contain no browser session data. The actual VNC WebSocket
+// remains password-protected below, so the viewer can load without an auth header.
+app.use("/novnc", express.static("/usr/share/novnc"));
+
+app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 
 app.use((req, res, next) => {
   if (req.path === "/health" || req.path === "/") return next();
@@ -25,11 +34,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get("/", (_req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
-
 app.post("/api/:action", async (req, res) => {
-  if (!authorized(req)) return res.status(401).json({ error: "Access denied" });
-
   const action = req.params.action;
   const url = String(req.body?.url || "").trim();
 
@@ -88,8 +93,6 @@ app.post("/api/:action", async (req, res) => {
   }
 });
 
-// noVNC is served from the system package. Its WebSocket is proxied to websockify.
-app.use("/novnc", express.static("/usr/share/novnc"));
 app.use(express.static(path.join(__dirname, "public")));
 
 server.on("upgrade", (req, socket, head) => {
