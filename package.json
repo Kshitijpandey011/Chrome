@@ -1,0 +1,13 @@
+{
+  "name": "simple-remote-chrome",
+  "version": "2.0.0",
+  "private": true,
+  "description": "A minimal Chrome-style remote browser powered by headless Chromium",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "express": "^4.21.2",
+    "playwright-core": "^1.56.1",
+    "ws": "^8.18.3"
+  }
+}
