@@ -1,9 +1,0 @@
-services:
-  - type: web
-    name: personal-remote-chrome
-    runtime: docker
-    plan: free
-    healthCheckPath: /health
-    envVars:
-      - key: BROWSER_PASSWORD
-        sync: false
