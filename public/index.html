@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>My Remote Chrome</title>
+  <style>
+    *{box-sizing:border-box} body{margin:0;background:#202124;color:#e8eaed;font:14px Arial,sans-serif}
+    .top{height:62px;display:flex;align-items:center;gap:9px;padding:10px 14px;background:#292a2d;border-bottom:1px solid #3c4043}
+    .brand{font-weight:700;white-space:nowrap;margin-right:8px}.controls{display:flex;gap:6px}
+    button{background:#3c4043;color:#f1f3f4;border:0;border-radius:8px;padding:10px 13px;cursor:pointer;font-size:15px}
+    button:hover{background:#505357}.address{flex:1;min-width:80px;background:#3c4043;color:white;border:1px solid #555;border-radius:22px;padding:11px 17px;outline:none}
+    .go{background:#8ab4f8;color:#202124;font-weight:700}.status{font-size:12px;color:#bdc1c6;white-space:nowrap}
+    #viewer{height:calc(100vh - 62px);width:100%;border:0;background:#fff}
+    #login{position:fixed;inset:0;background:#202124;display:flex;align-items:center;justify-content:center;padding:20px;z-index:5}
+    .panel{width:min(390px,100%);background:#292a2d;padding:28px;border-radius:16px;box-shadow:0 8px 35px #0006}
+    .panel h2{margin-top:0}.panel p{color:#bdc1c6;line-height:1.5}.panel input{width:100%;padding:12px;border-radius:8px;border:1px solid #5f6368;background:#202124;color:white;margin:8px 0 12px}
+    .panel button{width:100%;background:#8ab4f8;color:#202124;font-weight:700}.error{color:#f28b82;min-height:18px}
+    @media(max-width:650px){.brand{display:none}.status{display:none}.top{gap:5px;padding:8px}.controls button{padding:10px}.address{padding:10px}}
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div class="brand">🌐 My Remote Chrome</div>
+    <div class="controls">
+      <button title="Back" id="back">←</button>
+      <button title="Forward" id="forward">→</button>
+      <button title="Reload" id="reload">↻</button>
+    </div>
+    <input id="address" class="address" placeholder="Enter a website address (e.g. example.com)" autocomplete="url">
+    <button class="go" id="go">Go</button>
+    <span class="status" id="status">Connecting…</span>
+  </div>
+  <iframe id="viewer" title="Remote Chromium browser"></iframe>
+
+  <div id="login">
+    <div class="panel">
+      <h2>Open your remote browser</h2>
+      <p>Enter the access password you configured in Render.</p>
+      <input id="password" type="password" placeholder="Browser access password" autocomplete="current-password">
+      <button id="connect">Connect</button>
+      <div class="error" id="error"></div>
+    </div>
+  </div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let token = "";
+  async function api(action, body = {}) {
+    const response = await fetch(`/api/${action}`, {
+      method: "POST",
+      headers: {"Content-Type":"application/json", "Authorization":`Bearer ${token}`},
+      body: JSON.stringify(body)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Request failed");
+    return data;
+  }
+  function connect() {
+    token = $("password").value;
+    $("error").textContent = "";
+    $("viewer").src = `/novnc/vnc.html?autoconnect=true&resize=scale&view_only=false&path=websockify&token=${encodeURIComponent(token)}`;
+    $("login").style.display = "none";
+    $("status").textContent = "Remote Chrome";
+  }
+  $("connect").onclick = connect;
+  $("password").addEventListener("keydown", e => { if(e.key === "Enter") connect(); });
+  $("go").onclick = async () => {
+    try { await api("navigate", {url:$("address").value}); $("status").textContent="Navigating"; }
+    catch(e) { $("status").textContent=e.message; }
+  };
+  $("address").addEventListener("keydown", e => { if(e.key === "Enter") $("go").click(); });
+  for (const action of ["back","forward","reload"]) {
+    $(action).onclick = async () => {
+      try { await api(action); $("status").textContent="Remote Chrome"; }
+      catch(e) { $("status").textContent=e.message; }
+    };
+  }
+</script>
+</body>
+</html>
